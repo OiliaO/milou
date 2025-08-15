@@ -85,6 +85,12 @@ public class Main {
                 currentUser = null;
                 System.out.println("You have been logged out.");
                 break;
+            case "r":
+                handleReply();
+                break;
+            case "f":
+                handleForward();
+                break;
             default:
                 System.out.println("Invalid command.");
         }
@@ -214,5 +220,62 @@ public class Main {
             return email.toLowerCase() + "@milou.com";
         }
         return email.toLowerCase();
+    }
+
+    private static void handleReply() {
+        System.out.print("Enter the code of the email to reply to: ");
+        String code = scanner.nextLine();
+
+        Optional<Email> originalEmailOpt = emailService.readEmailByCode(code, currentUser);
+
+        if (originalEmailOpt.isPresent()) {
+            Email originalEmail = originalEmailOpt.get();
+            System.out.print("Enter your reply body: ");
+            String replyBody = scanner.nextLine();
+
+            String newCode = emailService.replyToEmail(originalEmail, currentUser, replyBody);
+
+            System.out.println("Successfully sent your reply to email " + code + ".");
+            System.out.println("Your new email code is: " + newCode);
+        } else {
+            System.out.println("Could not find or access email with code: " + code);
+        }
+    }
+
+
+    private static void handleForward() {
+        System.out.print("Enter the code of the email to forward: ");
+        String code = scanner.nextLine();
+
+        Optional<Email> originalEmailOpt = emailService.readEmailByCode(code, currentUser);
+
+        if (originalEmailOpt.isPresent()) {
+            Email originalEmail = originalEmailOpt.get();
+
+            System.out.print("Forward to (comma-separated emails): ");
+            String recipientsInput = scanner.nextLine();
+            List<String> recipientEmails = Arrays.asList(recipientsInput.split("\\s*,\\s*"));
+
+            List<User> recipientUsers = new ArrayList<>();
+            boolean allRecipientsValid = true;
+            for(String emailStr : recipientEmails) {
+                Optional<User> recipientOpt = userService.findUserByEmail(normalizeEmail(emailStr));
+                if(recipientOpt.isPresent()) {
+                    recipientUsers.add(recipientOpt.get());
+                } else {
+                    System.out.println("Error: User '" + emailStr + "' not found.");
+                    allRecipientsValid = false;
+                    break;
+                }
+            }
+
+            if(allRecipientsValid && !recipientUsers.isEmpty()) {
+                String newCode = emailService.forwardEmail(originalEmail, currentUser, recipientUsers);
+                System.out.println("Successfully forwarded your email. New email code: " + newCode);
+            }
+
+        } else {
+            System.out.println("Could not find or access email with code: " + code);
+        }
     }
 }

@@ -6,10 +6,7 @@ import com.milou.model.EmailRecipient;
 import com.milou.model.User;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class EmailService {
@@ -37,25 +34,46 @@ public class EmailService {
     }
 
     public List<Email> getReceivedEmails(User user) {
-        return SingletonSessionFactory.get().fromTransaction(session ->
-                session.createNativeQuery(
-                                "SELECT e.* FROM emails e " +
-                                        "JOIN email_recipients er ON e.id = er.email_id " +
-                                        "WHERE er.recipient_id = :userId ORDER BY e.sent_at DESC", Email.class)
-                        .setParameter("userId", user.getId())
-                        .getResultList()
-        );
+        return SingletonSessionFactory.get().fromTransaction(session -> {
+            List<Email> emails = session.createNativeQuery(
+                            "SELECT e.* FROM emails e " +
+                                    "JOIN email_recipients er ON e.id = er.email_id " +
+                                    "WHERE er.recipient_id = :userId ORDER BY e.sent_at DESC", Email.class)
+                    .setParameter("userId", user.getId())
+                    .getResultList();
+
+            if (emails.isEmpty()) {
+                return emails;
+            }
+
+
+            session.createNativeQuery("SELECT * FROM users WHERE id IN (:ids)", User.class)
+                    .setParameter("ids", emails.stream().map(e -> e.getSender().getId()).collect(Collectors.toList()))
+                    .getResultList();
+
+            return emails;
+        });
     }
 
     public List<Email> getUnreadEmails(User user) {
-        return SingletonSessionFactory.get().fromTransaction(session ->
-                session.createNativeQuery(
-                                "SELECT e.* FROM emails e " +
-                                        "JOIN email_recipients er ON e.id = er.email_id " +
-                                        "WHERE er.recipient_id = :userId AND er.is_read = false ORDER BY e.sent_at DESC", Email.class)
-                        .setParameter("userId", user.getId())
-                        .getResultList()
-        );
+        return SingletonSessionFactory.get().fromTransaction(session -> {
+            List<Email> emails = session.createNativeQuery(
+                            "SELECT e.* FROM emails e " +
+                                    "JOIN email_recipients er ON e.id = er.email_id " +
+                                    "WHERE er.recipient_id = :userId AND er.is_read = false ORDER BY e.sent_at DESC", Email.class)
+                    .setParameter("userId", user.getId())
+                    .getResultList();
+
+            if (emails.isEmpty()) {
+                return emails;
+            }
+
+            session.createNativeQuery("SELECT * FROM users WHERE id IN (:ids)", User.class)
+                    .setParameter("ids", emails.stream().map(e -> e.getSender().getId()).collect(Collectors.toList()))
+                    .getResultList();
+
+            return emails;
+        });
     }
 
 
@@ -100,12 +118,17 @@ public class EmailService {
 
 
     private Optional<Email> findByCode(String code) {
-        Email email = SingletonSessionFactory.get().fromTransaction(session ->
-                session.createNativeQuery("SELECT * FROM emails WHERE email_code = :code", Email.class)
-                        .setParameter("code", code)
-                        .getSingleResultOrNull()
-        );
-        return Optional.ofNullable(email);
+        return SingletonSessionFactory.get().fromTransaction(session -> {
+            Email email = session.createNativeQuery("SELECT * FROM emails WHERE email_code = :code", Email.class)
+                    .setParameter("code", code)
+                    .getSingleResultOrNull();
+
+            if (email != null) {
+                email.getSender().getName();
+            }
+
+            return Optional.ofNullable(email);
+        });
     }
 
     private void markAsRead(int emailId, int userId) {
@@ -134,5 +157,34 @@ public class EmailService {
             code = UUID.randomUUID().toString().replaceAll("-", "").substring(0, 6);
         } while (findByCode(code).isPresent());
         return code;
+    }
+
+    public String replyToEmail(Email originalEmail, User replyingUser, String replyBody) {
+        String newSubject = originalEmail.getSubject();
+        if (!newSubject.toLowerCase().startsWith("[re]")) {
+            newSubject = "[Re] " + newSubject;
+        }
+
+        List<User> newRecipients = new ArrayList<>();
+        newRecipients.add(originalEmail.getSender());
+        for (User recipient : originalEmail.getRecipients()) {
+            if (!recipient.getId().equals(replyingUser.getId())) {
+                newRecipients.add(recipient);
+            }
+        }
+        List<User> finalRecipients = newRecipients.stream().distinct().collect(Collectors.toList());
+
+        return sendEmail(replyingUser, finalRecipients, newSubject, replyBody);
+    }
+
+    public String forwardEmail(Email originalEmail, User forwardingUser, List<User> newRecipients) {
+        String newSubject = originalEmail.getSubject();
+        if (!newSubject.toLowerCase().startsWith("[fw]")) {
+            newSubject = "[Fw] " + newSubject;
+        }
+
+        String body = originalEmail.getBody();
+
+        return sendEmail(forwardingUser, newRecipients, newSubject, body);
     }
 }

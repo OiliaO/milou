@@ -8,7 +8,6 @@ public class SingletonSessionFactory {
 
     public static SessionFactory get() {
         if (sessionFactory == null) {
-            // فایل کانفیگ را می‌خواند و SessionFactory را می‌سازد
             sessionFactory = new Configuration()
                     .configure("hibernate.cfg.xml")
                     .buildSessionFactory();

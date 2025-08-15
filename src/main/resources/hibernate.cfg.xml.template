@@ -11,9 +11,15 @@
         <property name="hibernate.connection.username">YOUR_USERNAME</property>
         <property name="hibernate.connection.password">YOUR_PASSWORD</property>
 
-        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.show_sql">false</property>
         <property name="hibernate.format_sql">true</property>
         <property name="hibernate.highlight_sql">true</property>
+        <property name="hibernate.hbm2ddl.auto">update</property>
+
+        <mapping class="com.milou.model.User"/>
+        <mapping class="com.milou.model.Email"/>
+        <mapping class="com.milou.model.EmailRecipient"/>
+
 
     </session-factory>
 </hibernate-configuration>
