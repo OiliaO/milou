@@ -1,0 +1,27 @@
+USE sweet_kalam;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS emails (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email_code VARCHAR(10) NOT NULL UNIQUE,
+    sender_id INT NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    sent_at DATETIME NOT NULL,
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS email_recipients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email_id INT NOT NULL,
+    recipient_id INT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (email_id) REFERENCES emails(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+);
